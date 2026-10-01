@@ -1,0 +1,84 @@
+name: Build MacOS Manual Token
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_mode:
+        description: Development build for owner testing or signed production release
+        type: choice
+        required: true
+        default: development
+        options:
+          - development
+          - signed
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      MAC_RELEASE_MODE: ${{ inputs.release_mode }}
+      MAC_SIGN_IDENTITY: ${{ secrets.MAC_SIGN_IDENTITY }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+    defaults:
+      run:
+        working-directory: source/Know Your Nzone Manual Token - MacOS Source
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract Mac source
+        working-directory: .
+        run: unzip -q Know_Your_Nzone_ManualToken_MacOS_Source.zip -d source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check Apple Silicon build host
+        run: test "$(uname -m)" = arm64
+      - name: Validate signing configuration
+        if: inputs.release_mode == 'signed'
+        env:
+          MAC_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+        run: |
+          for name in MAC_CERTIFICATE_BASE64 MAC_CERTIFICATE_PASSWORD MAC_SIGN_IDENTITY APPLE_TEAM_ID APPLE_ID APPLE_APP_SPECIFIC_PASSWORD; do
+            test -n "${!name}" || { echo "Missing Actions secret: $name"; exit 1; }
+          done
+      - name: Import Developer ID certificate
+        if: inputs.release_mode == 'signed'
+        env:
+          MAC_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/know-your-nzone-signing.keychain-db"
+          certificate="$RUNNER_TEMP/know-your-nzone-certificate.p12"
+          password="$(openssl rand -hex 32)"
+          echo "::add-mask::$password"
+          printf '%s' "$MAC_CERTIFICATE_BASE64" | base64 --decode > "$certificate"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$certificate" -k "$keychain" -P "$MAC_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
+          rm -f "$certificate"
+      - name: Install pinned dependencies
+        run: npx --yes pnpm@11.25.0 install --frozen-lockfile
+      - name: Build native Mac app
+        run: npm run package:mac
+      - name: Upload Mac app ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Know-Your-Nzone-Mac-AppleSilicon-${{ inputs.release_mode }}
+          path: |
+            source/Know Your Nzone Manual Token - MacOS Source/dist/*.zip
+            source/Know Your Nzone Manual Token - MacOS Source/dist/*.sha256
+          if-no-files-found: error
+      - name: Remove temporary signing keychain
+        if: always() && inputs.release_mode == 'signed'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/know-your-nzone-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/know-your-nzone-certificate.p12"
