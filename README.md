@@ -1,4 +1,18 @@
-# Know Your Nzone - Windows Manual Token
+# Know Your Nzone - Manual Token
+
+## MacOS - Apple Silicon
+
+The native Mac version is JavaScript/Electron. End users need neither Python nor Node.js. It retains the manual token, Employee ID, Full Name, three use cases, automatic state identification, fallback and XLSX reports.
+
+- [Mac source archive](Know_Your_Nzone_ManualToken_MacOS_Source.zip)
+- [Illustrated MacBook SOP](MacBook_SOP.html) - download and open in a browser.
+- [Mac build and signing instructions](BUILD_MACOS.md)
+
+Use the **Build MacOS Manual Token** workflow under Actions to create an Apple Silicon app ZIP on a native macOS runner. Choose `development` for owner testing or `signed` after configuring the organisation's Developer ID certificate and notarization secrets. A development build is not a frictionless production release and may be blocked by macOS. The signed mode validates the signature, Apple's notarization ticket and Gatekeeper before publishing its artifact.
+
+Supported target: Apple Silicon Mac, macOS 13 or later, including MacBook Neo A18 Pro. First launch and live API use on the target Mac still require owner acceptance before wider distribution. Windows downloads remain available below.
+
+## Windows source
 
 Complete Windows manual-token application source, required data and updated illustrated SOP.
 
