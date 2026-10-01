@@ -66,7 +66,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
           rm -f "$certificate"
       - name: Install pinned dependencies
-        run: npx --yes pnpm@11.25.0 install --frozen-lockfile
+        run: npx --yes pnpm@11.25.0 install --frozen-lockfile --node-linker=hoisted
       - name: Build native Mac app
         run: npm run package:mac
       - name: Upload Mac app ZIP
